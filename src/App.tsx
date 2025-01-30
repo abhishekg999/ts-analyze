@@ -89,6 +89,7 @@ const ControlFlowGraph: React.FC = () => {
   const [analysis, setAnalysis] = React.useState<AnalysisResult | null>(null);
   const [nodes, setNodes] = React.useState<Node[]>([]);
   const [edges, setEdges] = React.useState<Edge[]>([]);
+  const [selectedVariable, setSelectedVariable] = React.useState<string | null>(null);
 
   useEffect(() => {
     const transform = async () => {
@@ -107,30 +108,56 @@ const ControlFlowGraph: React.FC = () => {
     let { nodes, edges } = layoutGraph(analysis);
     setNodes(nodes);
     setEdges(edges);
+    console.log(analysis)
   }, [analysis]);
 
-  
   const onNodesChange = useCallback((changes: NodeChange[]) => {
     setNodes(cur => applyNodeChanges(changes, cur));
-  }, [])
+  }, []);
 
+  const onVariableSelect = (variable: string) => {
+    setSelectedVariable(variable);
+  };
 
   if (!analysis) {
     return <div>Loading...</div>;
   }
 
+  
+
+  const highlightedNodes = selectedVariable
+    ? nodes.map(node => ({
+        ...node,
+        style: {
+          ...node.style,
+          backgroundColor: analysis?.variables[selectedVariable]?.usedIn.includes(node.id)
+            ? 'yellow'
+            : node.style?.backgroundColor,
+        },
+      }))
+    : nodes;
 
   return (
     <div style={{ width: "100vw", height: "100vh" }}>
+      <div>
+        <label>Select Variable: </label>
+        <select onChange={(e) => onVariableSelect(e.target.value)}>
+          <option value="">None</option>
+          {Object.keys(analysis.variables).map((variable) => (
+            <option key={variable} value={variable}>
+              {variable}
+            </option>
+          ))}
+        </select>
+      </div>
       <ReactFlow
-        nodes={nodes}
+        nodes={highlightedNodes}
         edges={edges}
         onNodesChange={onNodesChange}
         nodeTypes={nodeTypes}
         fitView
         nodesDraggable={true}
         connectionLineType={ConnectionLineType.SmoothStep}
-        
       >
         <Background color="#aaa" gap={16} />
         <Controls />

@@ -39,5 +39,5 @@ export async function analyzeFunction(code: string): Promise<AnalysisResult> {
 
   cleanupTree(ctx);
 
-  return { blocks: ctx.blocks, entryBlock: entryBlock.id };
+  return { blocks: ctx.blocks, entryBlock: entryBlock.id, variables: ctx.variables };
 }
