@@ -11,6 +11,7 @@ import {
   Node,
   TryStatement,
   VariableStatement,
+  CaseClause,
 } from "ts-morph";
 
 export type Block = {
@@ -60,7 +61,7 @@ export function processStatement(
   parentBlock: Block
 ): Block {
   switch (node.getKind()) {
-    case SyntaxKind.VariableStatement:
+    case SyntaxKind.VariableStatement: {
       const varDecls = (node as VariableStatement).getDeclarations();
       varDecls.forEach((decl) => {
         const varName = decl.getName();
@@ -68,13 +69,9 @@ export function processStatement(
       });
       parentBlock.code.push(node.getText());
       break;
+    }
     case SyntaxKind.Identifier:
-      const varName = node.getText();
-      if (ctx.variables[varName]) {
-        ctx.variables[varName].usedIn.push(parentBlock.id);
-      }
-      parentBlock.code.push(node.getText());
-      break;
+      return parentBlock;
     case SyntaxKind.ExpressionStatement:
       parentBlock.code.push(node.getText());
       break;
@@ -108,6 +105,9 @@ export function processStatement(
 
     case SyntaxKind.TryStatement:
       return processTryStatement(ctx, node as TryStatement, parentBlock);
+    case SyntaxKind.CaseClause:
+    case SyntaxKind.DefaultClause:
+      return parentBlock;
     default:
       node.forEachChild((child) => {
         parentBlock = processStatement(ctx, child, parentBlock);
@@ -257,6 +257,12 @@ export function processSwitchStatement(
     .getClauses()
     .forEach((clause) => {
       const caseBlock = createBlock(ctx);
+      if (clause.getKind() === SyntaxKind.DefaultClause) {
+        caseBlock.code.push("default:");
+      } else {
+        caseBlock.code.push(`case ${(clause as CaseClause).getExpression().getText()}:`);
+        parentBlock.children.push(caseBlock.id);
+      }
       parentBlock.children.push(caseBlock.id);
 
       clause.forEachChild((child) => {
@@ -277,7 +283,7 @@ export function processBreakStatement(
   parentBlock: Block
 ): Block {
   parentBlock.code.push("break");
-  parentBlock.isTerminator = true;
+  // parentBlock.isTerminator = true;
   return parentBlock;
 }
 
