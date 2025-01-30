@@ -9,6 +9,7 @@ import {
   ThrowStatement,
   WhileStatement,
   Node,
+  TryStatement,
 } from "ts-morph";
 
 export type Block = {
@@ -32,9 +33,9 @@ export function createContext(): Context {
     return { blocks: {}, blockCounter: 0 };
 }
 
-export function createBlock(ctx: Context): Block {
+export function createBlock(ctx: Context, init?: Pick<Block, 'code'>): Block {
   const id = `BB${ctx.blockCounter++}`;
-  const block: Block = { id, code: [], children: [], isTerminator: false };
+  const block: Block = { id, code: [], children: [], isTerminator: false, ...init };
   ctx.blocks[id] = block;
   return block;
 }
@@ -70,7 +71,9 @@ export function processStatement(ctx: Context, node: Node, parentBlock: Block): 
 
     case SyntaxKind.ContinueStatement:
       return processContinueStatement(ctx, node as ContinueStatement, parentBlock);
-
+    
+    case SyntaxKind.TryStatement:
+      return processTryStatement(ctx, node as TryStatement, parentBlock);
     default:
       node.forEachChild((child) => {
         parentBlock = processStatement(ctx, child, parentBlock);
@@ -86,35 +89,37 @@ export function processIfStatement(
     parentBlock: Block
 ): Block {
     const condition = ifStatement.getExpression().getText();
-    const thenBlock = createBlock(ctx);
     const exitBlock = createBlock(ctx);
 
     parentBlock.code.push(`if (${condition})`);
 
-    const lastThenBlock = processStatement(
+    const thenBlock = processStatement(
         ctx,
         ifStatement.getThenStatement(),
-        thenBlock
+        createBlock(ctx, {code: [`// then (${condition})`]})
     );
-    if (!lastThenBlock.isTerminator) {
-        lastThenBlock.children.push(exitBlock.id);
-    }
 
     parentBlock.children.push(thenBlock.id);
 
+    if (!thenBlock.isTerminator) {
+      thenBlock.children.push(exitBlock.id);
+    }
+
     if (ifStatement.getElseStatement()) {
         const elseBlock = createBlock(ctx);
+        elseBlock.code.push("else")
         const lastElseBlock = processStatement(
             ctx,
             ifStatement.getElseStatement()!,
             elseBlock
         );
         if (!lastElseBlock.isTerminator) {
+           
             lastElseBlock.children.push(exitBlock.id);
         }
         parentBlock.children.push(elseBlock.id);
     } else {
-        thenBlock.children.push(exitBlock.id);
+        parentBlock.children.push(exitBlock.id);
     }
 
     return exitBlock;
@@ -232,31 +237,62 @@ export function processContinueStatement(
     return parentBlock;
 }
 
+export function processTryStatement(
+  ctx: Context,
+  tryStatement: TryStatement,
+  parentBlock: Block
+): Block {
+  const tryBlock = createBlock(ctx);
+  parentBlock.code.push("try");
+  parentBlock.children.push(tryBlock.id);
+
+  const lastTryBlock = processStatement(ctx, tryStatement.getTryBlock(), tryBlock);
+  const exitBlock = createBlock(ctx);
+
+  if (!lastTryBlock.isTerminator) {
+    lastTryBlock.children.push(exitBlock.id);
+  }
+
+  if (tryStatement.getCatchClause()) {
+    const catchClause = tryStatement.getCatchClause()!;
+    const catchBlock = createBlock(ctx);
+    const variable = catchClause.getVariableDeclaration()?.getText() || "";
+    parentBlock.children.push(catchBlock.id);
+    catchBlock.code.push(`catch (${variable})`);
+    catchBlock.children.push(exitBlock.id);
+
+    const lastCatchBlock = processStatement(ctx, catchClause.getBlock(), catchBlock);
+    if (!lastCatchBlock.isTerminator) {
+      lastCatchBlock.children.push(exitBlock.id);
+    }
+  }
+
+  if (tryStatement.getFinallyBlock()) {
+    const finallyBlock = createBlock(ctx);
+    tryBlock.code.push("finally");
+    tryBlock.children.push(finallyBlock.id);
+
+    const lastFinallyBlock = processStatement(ctx, tryStatement.getFinallyBlock()!, finallyBlock);
+    if (!lastFinallyBlock.isTerminator) {
+      lastFinallyBlock.children.push(exitBlock.id);
+    }
+  }
+
+  return exitBlock;
+}
+
 export function cleanupTree(ctx: Context): void {
-    const blocksToRemove = new Set<string>();
-
-    // Identify empty blocks
-    Object.values(ctx.blocks).forEach((block) => {
-        if (block.code.length === 0 && block.children.length === 1 && !block.isTerminator) {
-            blocksToRemove.add(block.id);
+    Object.keys(ctx.blocks).forEach((blockId) => {
+      const block = ctx.blocks[blockId];
+      if (block.code.length === 0 && block.children.length === 0) {
+      delete ctx.blocks[blockId];
+      // Remove references to this block in other blocks
+      Object.values(ctx.blocks).forEach((otherBlock) => {
+        const index = otherBlock.children.indexOf(blockId);
+        if (index !== -1) {
+        otherBlock.children.splice(index, 1);
         }
-    });
-
-    // Remove empty blocks and update connections
-    blocksToRemove.forEach((blockId) => {
-        const block = ctx.blocks[blockId];
-        const parentBlocks = Object.values(ctx.blocks).filter((b) => b.children.includes(blockId));
-        const childBlockId = block.children[0];
-
-        parentBlocks.forEach((parentBlock) => {
-            parentBlock.children = parentBlock.children.map((childId) => (childId === blockId ? childBlockId : childId));
-        });
-
-        delete ctx.blocks[blockId];
-    });
-
-    // Final cleanup to remove any dangling references
-    Object.values(ctx.blocks).forEach((block) => {
-        block.children = block.children.filter((child) => !!ctx.blocks[child]);
+      });
+      }
     });
 }

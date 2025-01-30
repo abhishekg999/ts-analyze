@@ -21,40 +21,45 @@ import { AnalysisResult } from "./lib/handlers";
 
 
 const initSrc = `
-function x() {
+function _(req, res) {
+   try {
+       var noItemsMessage = "No Items Found";
+       var numberOfItems = null;
+       const data = serialize.unserialize(req.body);
+       var query;
 
-for (var i = 0; i < 10; i++) {
-a() 
-    for (var j = 0; j < 10; j++) {
-b()
-    if (i == 5 && j ==5) {
-   c()
-    break;
-        }
-    }
-}
+       if(typeof(data) === 'object') {
+            query = \`{ "\${data.fieldName}": null }\`;
+            noItemsMessage = data.message;
+            numberOfItems = data.items;
+       } else {
+            response = "specify query!";     
+            res.send(response);
+            return;
+       }
+       
+       const client = await clientPromise;
+       const db = client.db("sample_mflix");
+       query = JSON.parse(query);
+       query[data.fieldName] = data.fieldValue;
+       const movies = await db
+           .collection("movies")
+           .find(query)
+           .sort({ metacritic: -1 })
+           .limit(isNaN(numberOfItems) ? 1 : numberOfItems > 20 ? 20 : numberOfItems)
+           .maxTimeMS(5000)
+           .toArray();
+       if(movies.length === 0) {
+            res.send(noItemsMessage);
+            return;
+       }
 
-
-
-grade = 'B';
-switch (grade) {
-  case 'A':
-    console.log("Great job");
-    break;
-  case 'B':
-    console.log("OK job");
-    break;
-  case 'C':
-    console.log("You can do better");
-    break;
-  default:
-    console.log("Oy vey");
-    break;
-}
-
-
-
-}`;
+       res.send(JSON.stringify(movies));
+   } catch (e) {
+       console.error(e);
+   }
+};
+`;
 
 const nodeTypes = {
   customNode: ({ data }: { data: { label: string } }) => (

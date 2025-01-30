@@ -15,7 +15,7 @@ export const layoutGraph = (data: AnalysisResult | null) => {
   const edges: Edge[] = [];
 
   const g = new dagre.graphlib.Graph();
-  g.setGraph({});
+  g.setGraph({ rankdir: 'TB', nodesep: 200, edgesep: 50, ranksep: 100 });
   g.setDefaultEdgeLabel(() => ({}));
 
   Object.keys(data.blocks).forEach((blockId) => {
@@ -37,7 +37,6 @@ export const layoutGraph = (data: AnalysisResult | null) => {
         target: child,
         animated: true,
         type: ConnectionLineType.SmoothStep,
-
       });
 
       g.setEdge(blockId, child);
@@ -49,7 +48,7 @@ export const layoutGraph = (data: AnalysisResult | null) => {
   // Position nodes based on dagre layout
   nodes.forEach((node) => {
     const nodeLayout = g.node(node.id);
-    node.position = { x: nodeLayout.x, y: nodeLayout.y };
+    node.position = { x: nodeLayout.x - 100, y: nodeLayout.y - 50 };
   });
 
   return { nodes, edges };
