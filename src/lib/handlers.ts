@@ -12,6 +12,7 @@ import {
   TryStatement,
   VariableStatement,
   CaseClause,
+  FunctionDeclaration,
 } from "ts-morph";
 
 export type Block = {
@@ -53,6 +54,17 @@ export function createBlock(ctx: Context, init?: Pick<Block, "code">): Block {
   };
   ctx.blocks[id] = block;
   return block;
+}
+
+export function processFunctionDeclaration(
+  ctx: Context,
+  func: FunctionDeclaration,
+  parentBlock: Block
+): Block {
+  const funcName = func.getName() || "anonymous";
+  const params = func.getParameters().map(p => p.getText()).join(", ");
+  parentBlock.code.push(`function ${funcName}(${params}) { ... }`);
+  return parentBlock;
 }
 
 export function processStatement(
@@ -108,6 +120,8 @@ export function processStatement(
     case SyntaxKind.CaseClause:
     case SyntaxKind.DefaultClause:
       return parentBlock;
+    case SyntaxKind.FunctionDeclaration:
+      return processFunctionDeclaration(ctx, node as FunctionDeclaration, parentBlock);
     default:
       node.forEachChild((child) => {
         parentBlock = processStatement(ctx, child, parentBlock);
@@ -133,7 +147,7 @@ export function processIfStatement(
   parentBlock: Block
 ): Block {
   const condition = ifStatement.getExpression().getText();
-  const exitBlock = createBlock(ctx);
+  const exitBlock = createBlock(ctx, {code: ["// exit"]});
 
   parentBlock.code.push(`if (${condition})`);
 

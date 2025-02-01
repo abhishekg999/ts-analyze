@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import ReactFlow, {
   Background,
   Controls,
@@ -15,50 +15,41 @@ import ReactFlow, {
 import "reactflow/dist/style.css";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
-import { analyzeFunction, } from "./lib";
+import { analyzeFunctions } from "./lib";
 import { layoutGraph } from "./lib/utils";
 import { AnalysisResult } from "./lib/handlers";
-
+import { Box, Flex, Stack, createListCollection } from "@chakra-ui/react";
+import {
+  SelectContent,
+  SelectItem,
+  SelectLabel,
+  SelectRoot,
+  SelectTrigger,
+  SelectValueText,
+} from "./components/ui/select";
+import { Provider } from "./components/ui/provider";
 
 const initSrc = `
-function _(req, res) {
-   try {
-       var noItemsMessage = "No Items Found";
-       var numberOfItems = null;
-       const data = serialize.unserialize(req.body);
-       var query;
+function fibonacci(n: number): number {
+  let a = 0, b = 1, temp;
+  while (n >= 0) {
+    temp = a;
+    a = a + b;
+    b = temp;
+    n--;
+  }
+  return b;
+}
 
-       if(typeof(data) === 'object') {
-            query = \`{ "\${data.fieldName}": null }\`;
-            noItemsMessage = data.message;
-            numberOfItems = data.items;
-       } else {
-            response = "specify query!";     
-            res.send(response);
-            return;
-       }
-       
-       const client = await clientPromise;
-       const db = client.db("sample_mflix");
-       query = JSON.parse(query);
-       query[data.fieldName] = data.fieldValue;
-       const movies = await db
-           .collection("movies")
-           .find(query)
-           .sort({ metacritic: -1 })
-           .limit(isNaN(numberOfItems) ? 1 : numberOfItems > 20 ? 20 : numberOfItems)
-           .maxTimeMS(5000)
-           .toArray();
-       if(movies.length === 0) {
-            res.send(noItemsMessage);
-            return;
-       }
+function factorial(n: number): number {
+  let result = 1;
+  while (n > 1) {
+    result *= n;
+    n--;
+  }
+  return result;
+}
 
-       res.send(JSON.stringify(movies));
-   } catch (e) {
-       console.error(e);
-   }
-};
 `;
 
 const nodeTypes = {
@@ -83,98 +74,139 @@ const nodeTypes = {
   ),
 };
 
-
 const ControlFlowGraph: React.FC = () => {
-  const [code, _] = React.useState<string>(initSrc);
-  const [analysis, setAnalysis] = React.useState<AnalysisResult | null>(null);
+  const [code,] = React.useState<string>(initSrc);
+  const [analyses, setAnalyses] = React.useState<Record<string, AnalysisResult>>({});
   const [nodes, setNodes] = React.useState<Node[]>([]);
   const [edges, setEdges] = React.useState<Edge[]>([]);
-  const [selectedVariable, setSelectedVariable] = React.useState<string | null>(null);
+
+  const [selectedFunctionName, setSelectedFunctionName] = useState<string[]>([]);
+  const [selectedVariable, setSelectedVariable] = useState<string[]>([]);
 
   useEffect(() => {
     const transform = async () => {
-      const result = await analyzeFunction(code);
-      console.log(JSON.stringify(result, null, 2));
-      setAnalysis(result);
+      const results = await analyzeFunctions(code);
+      setAnalyses(results);
+      setSelectedFunctionName([Object.keys(results)[0]]);
     };
 
     transform();
-  }, []);
+  }, [code]);
 
   useEffect(() => {
-    if (!analysis) {
+    if (Object.keys(analyses).length === 0 || !selectedFunctionName) {
       return;
     }
-    let { nodes, edges } = layoutGraph(analysis);
+    const analysis = analyses[selectedFunctionName[0]];
+    const { nodes, edges } = layoutGraph(analysis);
     setNodes(nodes);
     setEdges(edges);
-    console.log(analysis)
-  }, [analysis]);
+  }, [analyses, selectedFunctionName]);
 
   const onNodesChange = useCallback((changes: NodeChange[]) => {
     setNodes(cur => applyNodeChanges(changes, cur));
   }, []);
 
-  const onVariableSelect = (variable: string) => {
-    setSelectedVariable(variable);
-  };
-
-  if (!analysis) {
+  if (Object.keys(analyses).length === 0) {
     return <div>Loading...</div>;
   }
 
-  
-
-  const highlightedNodes = selectedVariable
+  const highlightedNodes = selectedVariable.length > 0
     ? nodes.map(node => ({
         ...node,
         style: {
           ...node.style,
-          backgroundColor: analysis?.variables[selectedVariable]?.usedIn.includes(node.id)
+          backgroundColor: analyses[selectedFunctionName[0]]?.variables[selectedVariable[0]]?.usedIn.includes(node.id)
             ? 'yellow'
             : node.style?.backgroundColor,
         },
       }))
     : nodes;
 
+  const functionCollection = createListCollection({
+    items: Object.keys(analyses).map((funcName) => ({
+      label: funcName,
+      value: funcName,
+    })),
+  });
+
+  const variableCollection = createListCollection({
+    items: Object.keys(analyses[selectedFunctionName[0]]?.variables || {}).map((variable) => ({
+      label: variable,
+      value: variable,
+    })),
+  });
+
   return (
-    <div style={{ width: "100vw", height: "100vh" }}>
-      <div>
-        <label>Select Variable: </label>
-        <select onChange={(e) => onVariableSelect(e.target.value)}>
-          <option value="">None</option>
-          {Object.keys(analysis.variables).map((variable) => (
-            <option key={variable} value={variable}>
-              {variable}
-            </option>
-          ))}
-        </select>
-      </div>
-      <ReactFlow
-        nodes={highlightedNodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        nodeTypes={nodeTypes}
-        fitView
-        nodesDraggable={true}
-        connectionLineType={ConnectionLineType.SmoothStep}
-      >
-        <Background color="#aaa" gap={16} />
-        <Controls />
-        <MiniMap
-          nodeColor={(n) => "#2e2e2e"} 
-          style={{ background: "#1e1e1e" }} 
-        />
-      </ReactFlow>
-    </div>
+    <Flex height="100vh" width="100vw" overflow="hidden">
+      <Box width="300px" padding="4" bg="gray.700" color="white">
+      <Stack gap="5">
+          <SelectRoot
+            collection={functionCollection}
+            value={selectedFunctionName}
+            onValueChange={(details) => setSelectedFunctionName(details.value)}
+          >
+            <SelectLabel>Select Function</SelectLabel>
+            <SelectTrigger>
+              <SelectValueText placeholder="Select a function" />
+            </SelectTrigger>
+            <SelectContent>
+              {functionCollection.items.map((func) => (
+                <SelectItem item={func} key={func.value}>
+                  {func.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </SelectRoot>
+          <SelectRoot
+            collection={variableCollection}
+            value={selectedVariable}
+            onValueChange={(details) => setSelectedVariable(details.value)}
+          >
+            <SelectLabel>Select Variable</SelectLabel>
+            <SelectTrigger>
+              <SelectValueText placeholder="Select a variable" />
+            </SelectTrigger>
+            <SelectContent>
+              {variableCollection.items.map((variable) => (
+                <SelectItem item={variable} key={variable.value}>
+                  {variable.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </SelectRoot>
+        </Stack>
+      </Box>
+      <Box flex="1" overflow="hidden">
+        <ReactFlow
+          nodes={highlightedNodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          nodeTypes={nodeTypes}
+          fitView
+          nodesDraggable={true}
+          connectionLineType={ConnectionLineType.SmoothStep}
+          style={{ width: '100%', height: '100%' }}
+        >
+          <Background color="#aaa" gap={16} />
+          <Controls />
+          <MiniMap
+            nodeColor={() => "#2e2e2e"} 
+            style={{ background: "#1e1e1e" }} 
+          />
+        </ReactFlow>
+      </Box>
+    </Flex>
   );
 };
 
 const App: React.FC = () => {
   return (
-    <ReactFlowProvider>
-      <ControlFlowGraph />
-    </ReactFlowProvider>
+    <Provider>
+      <ReactFlowProvider>
+        <ControlFlowGraph />
+      </ReactFlowProvider>
+    </Provider>
   );
 };
 
