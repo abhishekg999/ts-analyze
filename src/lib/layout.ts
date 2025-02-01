@@ -1,8 +1,6 @@
 import dagre from "dagre";
 import { Edge, ConnectionLineType } from "reactflow";
-import {
-    Node,
-  } from "reactflow";
+import { Node } from "reactflow";
 import { AnalysisResult } from "./handlers";
 
 export const layoutGraph = (data: AnalysisResult | null) => {
@@ -14,8 +12,10 @@ export const layoutGraph = (data: AnalysisResult | null) => {
   const nodes: Node[] = [];
   const edges: Edge[] = [];
 
+  console.log(data);
+
   const g = new dagre.graphlib.Graph();
-  g.setGraph({ rankdir: 'TB', nodesep: 200, edgesep: 50, ranksep: 100 });
+  g.setGraph({ rankdir: 'TB', nodesep: 300, edgesep: 100, ranksep: 200 });
   g.setDefaultEdgeLabel(() => ({}));
 
   Object.keys(data.blocks).forEach((blockId) => {
@@ -23,7 +23,7 @@ export const layoutGraph = (data: AnalysisResult | null) => {
     // @ts-expect-error - Dagre will populate position afterwards
     nodes.push({
       id: blockId,
-      data: { label: block.code.join("\n") },
+      data: { lines: block.code },
       type: "customNode",
       draggable: true
     });
@@ -36,7 +36,8 @@ export const layoutGraph = (data: AnalysisResult | null) => {
         source: blockId,
         target: child,
         animated: true,
-        type: ConnectionLineType.SmoothStep,
+        // type: ConnectionLineType.SmoothStep,
+        type: 'smart'
       });
 
       g.setEdge(blockId, child);

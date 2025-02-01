@@ -13,6 +13,7 @@
     "@chakra-ui/react": "^3.5.1",
     "@emotion/react": "^11.14.0",
     "@monaco-editor/react": "^4.6.0",
+    "@tisoap/react-flow-smart-edge": "^3.0.0",
     "@types/dagre": "^0.7.52",
     "@types/react-syntax-highlighter": "^15.5.13",
     "@typescript-eslint/typescript-estree": "^8.22.0",

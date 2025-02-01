@@ -13,10 +13,11 @@ import ReactFlow, {
   Edge,
 } from "reactflow";
 import "reactflow/dist/style.css";
+import { SmartStraightEdge } from '@tisoap/react-flow-smart-edge'
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { analyzeFunctions } from "./lib";
-import { layoutGraph } from "./lib/utils";
+import { layoutGraph } from "./lib/layout";
 import { AnalysisResult } from "./lib/handlers";
 import { Box, Flex, Stack, createListCollection } from "@chakra-ui/react";
 import {
@@ -49,11 +50,10 @@ function factorial(n: number): number {
   }
   return result;
 }
-
 `;
 
 const nodeTypes = {
-  customNode: ({ data }: { data: { label: string } }) => (
+  customNode: ({ data }: { data: { lines: string[] } }) => (
     <div
       style={{
         padding: 10,
@@ -65,14 +65,36 @@ const nodeTypes = {
         wordWrap: "break-word",
       }}
     >
-      <SyntaxHighlighter language="typescript" style={vscDarkPlus}>
-        {data.label}
-      </SyntaxHighlighter>
+      {data.lines.map((line, index) => (
+        <div key={index} style={{ position: "relative" }}>
+          <SyntaxHighlighter language="typescript" style={vscDarkPlus} wrapLines={false}>
+            {line}
+          </SyntaxHighlighter>
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: "rgba(255, 255, 255, 0.1)",
+              opacity: 0,
+              transition: "opacity 0.2s",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
+            onMouseLeave={(e) => (e.currentTarget.style.opacity = "0")}
+          />
+        </div>
+      ))}
       <Handle type="target" position={Position.Top} />
       <Handle type="source" position={Position.Bottom} />
     </div>
   ),
 };
+
+const edgeTypes = {
+  smart : SmartStraightEdge
+}
 
 const ControlFlowGraph: React.FC = () => {
   const [code,] = React.useState<string>(initSrc);
@@ -183,9 +205,9 @@ const ControlFlowGraph: React.FC = () => {
           edges={edges}
           onNodesChange={onNodesChange}
           nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
           fitView
           nodesDraggable={true}
-          connectionLineType={ConnectionLineType.SmoothStep}
           style={{ width: '100%', height: '100%' }}
         >
           <Background color="#aaa" gap={16} />

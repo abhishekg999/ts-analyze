@@ -213,7 +213,7 @@ export function processWhileStatement(
   const loopBlock = createBlock(ctx);
   const exitBlock = createBlock(ctx);
 
-  parentBlock.code.push(`while (${condition})`);
+  loopBlock.code.push(`while (${condition})`);
   parentBlock.children.push(loopBlock.id);
 
   const lastLoopBlock = processStatement(
