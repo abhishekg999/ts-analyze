@@ -63,7 +63,7 @@ class HelloWorldPanel {
             // Panel view type
             "showHelloWorld", 
             // Panel title
-            "Hello World", 
+            "TS Analyze", 
             // The editor column the panel should be displayed in
             vscode_1.ViewColumn.One, 
             // Extra panel configurations
@@ -115,7 +115,7 @@ class HelloWorldPanel {
           <meta charset="UTF-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1.0" />
           <link rel="stylesheet" type="text/css" href="${stylesUri}">
-          <title>Hello World</title>
+          <title>TS Analyze</title>
         </head>
         <body>
           <div id="root"></div>

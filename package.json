@@ -1,6 +1,6 @@
 {
-  "name": "hello-world-react-vite",
-  "displayName": "hello-world-react-vite",
+  "name": "ts-analyze",
+  "displayName": "ts-analyze",
   "description": "A hello world sample extension to demonstrate using React + Vite with the Webview UI Toolkit for VS Code.",
   "version": "0.0.1",
   "engines": {

@@ -13,6 +13,7 @@ import {
   VariableStatement,
   CaseClause,
   FunctionDeclaration,
+  ForOfStatement,
 } from "ts-morph";
 
 export type Block = {
@@ -63,6 +64,10 @@ export function processFunctionDeclaration(
 ): Block {
   const funcName = func.getName() || "anonymous";
   const params = func.getParameters().map(p => p.getText()).join(", ");
+  func.getParameters().forEach(param => {
+    const paramName = param.getName();
+    ctx.variables[paramName] = { declaredIn: parentBlock.id, usedIn: [] };
+  });
   parentBlock.code.push(`function ${funcName}(${params}) { ... }`);
   return parentBlock;
 }
@@ -122,6 +127,31 @@ export function processStatement(
       return parentBlock;
     case SyntaxKind.FunctionDeclaration:
       return processFunctionDeclaration(ctx, node as FunctionDeclaration, parentBlock);
+    case SyntaxKind.ArrowFunction:
+    case SyntaxKind.FunctionExpression: {
+      const isArrow = node.getKind() === SyntaxKind.ArrowFunction;
+      const params = node.getChildrenOfKind(SyntaxKind.Parameter)
+        .map(p => p.getText())
+        .join(", ");
+        
+      // Register parameters as variables
+      node.getChildrenOfKind(SyntaxKind.Parameter).forEach(param => {
+        const paramName = param.getText();
+        ctx.variables[paramName] = { declaredIn: parentBlock.id, usedIn: [] };
+      });
+
+      // Add function definition to code block
+      parentBlock.code.push(`${isArrow ? `(${params}) => ` : `function(${params})`} { ... }`);
+
+      // Process function body
+      const body = node.getChildrenOfKind(SyntaxKind.Block)[0] || 
+                   node.getChildrenOfKind(SyntaxKind.ArrowFunction)[0];
+      if (body) {
+        processStatement(ctx, body, parentBlock);
+      }
+
+      break;
+    }
     default:
       node.forEachChild((child) => {
         parentBlock = processStatement(ctx, child, parentBlock);

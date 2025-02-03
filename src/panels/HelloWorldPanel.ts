@@ -52,36 +52,39 @@ export class HelloWorldPanel {
    *
    * @param extensionUri The URI of the directory containing the extension.
    * @param fileContent The initial content to be sent to the webview.
+   * @param viewColumn The column in which to show the webview panel.
    */
-  public static render(extensionUri: Uri, fileContent: string) {
+  public static render(extensionUri: Uri, initialContent: string, viewColumn: ViewColumn = ViewColumn.Beside): HelloWorldPanel {
     if (HelloWorldPanel.currentPanel) {
-      // If the webview panel already exists reveal it
-      HelloWorldPanel.currentPanel._panel.reveal(ViewColumn.One);
-      // Send the file content to existing panel
-      HelloWorldPanel.currentPanel._panel.webview.postMessage({ 
-        type: 'setContent', 
-        content: fileContent 
-      });
-    } else {
-      // If a webview panel does not already exist create and show a new one
-      const panel = window.createWebviewPanel(
-        // Panel view type
-        "showHelloWorld",
-        // Panel title
-        "Hello World",
-        // The editor column the panel should be displayed in
-        ViewColumn.One,
-        // Extra panel configurations
-        {
-          // Enable JavaScript in the webview
-          enableScripts: true,
-          // Restrict the webview to only load resources from the `out` and `webview-ui/build` directories
-          localResourceRoots: [Uri.joinPath(extensionUri, "out"), Uri.joinPath(extensionUri, "webview-ui/build")],
-        }
-      );
-
-      HelloWorldPanel.currentPanel = new HelloWorldPanel(panel, extensionUri, fileContent);
+      HelloWorldPanel.currentPanel._panel.reveal(viewColumn);
+      HelloWorldPanel.currentPanel.update(initialContent);
+      return HelloWorldPanel.currentPanel;
     }
+
+    const panel = window.createWebviewPanel(
+      "showHelloWorld",
+      "Code Analysis",
+      viewColumn,
+      {
+        enableScripts: true,
+        localResourceRoots: [Uri.joinPath(extensionUri, "out"), Uri.joinPath(extensionUri, "webview-ui/build")],
+        retainContextWhenHidden: true, // Keep the webview alive in the background
+      }
+    );
+
+    HelloWorldPanel.currentPanel = new HelloWorldPanel(panel, extensionUri, initialContent);
+    return HelloWorldPanel.currentPanel;
+  }
+
+  public update(content: string) {
+    if (!this._panel.visible) {
+      this._panel.reveal(ViewColumn.Two);
+    }
+    
+    this._panel.webview.postMessage({
+      type: 'setContent',
+      content: content
+    });
   }
 
   /**
@@ -128,7 +131,7 @@ export class HelloWorldPanel {
           <meta charset="UTF-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1.0" />
           <link rel="stylesheet" type="text/css" href="${stylesUri}">
-          <title>Hello World</title>
+          <title>TS Analyze</title>
         </head>
         <body>
           <div id="root"></div>
